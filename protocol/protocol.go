@@ -5,20 +5,28 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 )
 
 
 type Handler interface {
-	Handle(ReadWriter) error
+	Handle(BaseHandler) error
 }
+
+type BaseHandler interface {
+	Read() (string, error)
+	Write(msg string) error
+	Active() bool
+	IsClosed() bool
+	Dispose() bool
+}
+
 
 type Protocol struct {
 	Conn *net.Conn
-}
-
-type ReadWriter interface {
-	Read() (string, error)
-	Write(msg string) error
+	Inactive time.Duration
+	Timer *time.Timer
+	Closed *bool
 }
 
 
@@ -36,10 +44,39 @@ func (p Protocol) Write(message string) error {
 	}(p.Conn, message)
 }
 
-func newProtocol(c *net.Conn) Protocol {
-	return Protocol{
-		Conn: c,
+func (p Protocol) Active() bool {
+	return p.Timer.Reset(p.Inactive)
+}
+
+func (p Protocol) IsClosed() bool {
+	return (*p.Closed)
+}
+
+func (p Protocol) Dispose() bool {
+	var active bool
+	if active := p.Timer.Stop(); active {
+		c := p.Conn
+		(*c).Close()
+		(*p.Closed) = true
 	}
+	return active
+}
+
+
+func newBaseHandler(c *net.Conn, inactive time.Duration) BaseHandler {
+	cb := false
+	cp := &cb
+	t := time.AfterFunc(inactive, func() {
+			(*c).Close()
+			(*cp) = true
+		})
+	p := Protocol{
+		Conn: c,
+		Inactive: inactive,
+		Timer: t,
+		Closed: cp,
+	}
+	return p
 }
 
 func newHandler(name string) Handler {
@@ -54,12 +91,14 @@ func newHandler(name string) Handler {
 	return h
 }
 
-func Serve(c *net.Conn, name string) {
-	p := newProtocol(c)
+
+func Serve(c *net.Conn, name string, inactive time.Duration) {
+	base := newBaseHandler(c, inactive)
 	handler := newHandler(name)
 
-	err := handler.Handle(p)
+	err := handler.Handle(base)
 	if err != nil {
 		log.Fatalf("Handle %s error: %v", name, err)
 	}
+	base.Dispose()
 }

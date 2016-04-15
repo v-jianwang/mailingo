@@ -4,23 +4,26 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"time"
+	
 	"github.com/v-jianwang/mailingo/protocol"
 )
 
 type Usage struct {
 	Protocol string
 	Port int
+	InactiveTimeout time.Duration
 }
 
 
-func (u *Usage) Launch() {
-
+func (u Usage) Launch() {
 	addr := ":" + strconv.Itoa(u.Port)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("Listen to %s error %v", addr, err)
 		return
 	}
+
 	defer listener.Close()
 
 	for {
@@ -30,14 +33,13 @@ func (u *Usage) Launch() {
 			continue
 		}
 
-		
-		go func(c net.Conn, p string) {
-			log.Println("Receive a connection from client", c.RemoteAddr())
+		go func(c *net.Conn, p string, t time.Duration) {
+			log.Println("Hello to a new client", (*c).RemoteAddr())
 
-			protocol.Serve(&c, p)
-			c.Close()
+			// create inactive timer for this connection
+			protocol.Serve(c, p, t)
 			
-			log.Println("Close a connection from client", c.RemoteAddr())
-		}(conn, u.Protocol)
+			log.Println("Goodbye to the client", (*c).RemoteAddr())
+		}(&conn, u.Protocol, u.InactiveTimeout)
 	}
 }

@@ -2,6 +2,7 @@ package usage
 
 import (
 	"fmt"
+	"time"
 )
 
 
@@ -20,7 +21,7 @@ func NewUsageContainer() *UsageContainer {
 }
 
 
-func (c *UsageContainer) NewUsage(name string, port int) *Usage {
+func (c *UsageContainer) NewUsage(name string, port int, inactive time.Duration) *Usage {
 	var usage *Usage
 
 	key := fmt.Sprintf("%s-%s", name, port)
@@ -30,6 +31,7 @@ func (c *UsageContainer) NewUsage(name string, port int) *Usage {
 		usage = &Usage{
 			Protocol: name,
 			Port: port,
+			InactiveTimeout: inactive,
 		}
 
 		c.Usages[key] = usage

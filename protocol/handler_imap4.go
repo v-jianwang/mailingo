@@ -9,6 +9,6 @@ import (
 type HandlerImap4 struct {
 }
 
-func (h HandlerImap4) Handle(rw ReadWriter) error {
+func (h HandlerImap4) Handle(base BaseHandler) error {
 	return nil
 }

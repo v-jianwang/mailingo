@@ -3,6 +3,7 @@ package protocol
 import (
 	"fmt"
 	"log"	
+
 	"github.com/v-jianwang/mailingo/protocol/pop3"
 )
 
@@ -10,9 +11,13 @@ import (
 type State string
 const (
 	StateNotSet State = "NotSet"
-	StateAuthorization State = "Authorization"
-	StateTransaction State = "Transaction"
-	StateUpdate State = "Update"
+	StateAuthorization = "Authorization"
+	StateTransaction = "Transaction"
+	StateUpdate = "Update"
+)
+
+const (
+	ErrorUseOfClosedNetwork = "use of closed network connection"
 )
 
 
@@ -33,29 +38,40 @@ func NewHandlerPop3() HandlerPop3 {
 		AcceptableCommands: make(map[State][]string),
 	}
 
-	h.acceptCommand(StateAuthorization, "USER", "PASS", "QUIT")
-	h.acceptCommand(StateTransaction, "STAT", "LIST", "RETR", "DELE", "NOOP", "RSET", "QUIT","TOP")
+	// define acceptable commands by state
+	acceptCommand(&h, StateAuthorization, "USER", "PASS", "QUIT")
+	acceptCommand(&h, StateTransaction, "STAT", "LIST", "RETR", "DELE", "NOOP", "RSET", "QUIT","TOP")
 
 	return h
 }
 
-func (h HandlerPop3) acceptCommand(s State, cmds ...string) {
+
+func acceptCommand(h *HandlerPop3, s State, cmds ...string) {
 	h.AcceptableCommands[s] = cmds
 }
 
-func (h HandlerPop3) Handle(rw ReadWriter) error {
+func (h HandlerPop3) Handle(base BaseHandler) error {
 	var msg, line, keyword string
 	var ok bool
-	var err error
+	var readErr, writeErr error
+	// var readErrCount, writeErrCount int = 0, 0
 
 	for {
 
 		keyword = "GREET"
 		log.Printf("Current State: %v\n", h.CurrentState)
+
 		if h.CurrentState != StateNotSet {
-			line, err = rw.Read()
-			if err != nil {
-				log.Fatalf("Read in pop3.Handler error: %v", err)
+			line, readErr = base.Read()
+
+			if readErr != nil {
+				if base.IsClosed() {
+					break
+				}
+				log.Fatalf("Read in pop3.Handler error[%t]: %v", readErr, readErr)
+				return readErr
+			} else {
+				base.Active()
 			}
 
 			h.CurrentCommand = pop3.NewCommand(line)
@@ -92,9 +108,10 @@ func (h HandlerPop3) Handle(rw ReadWriter) error {
 				msg = h.incorrect_stat()
 		}		
 
-		err = rw.Write(msg)
-		if err != nil {
-			log.Fatalf("Write in pop3.Handler %q error: %v", msg, err)
+		writeErr = base.Write(msg)
+		if writeErr != nil {
+			log.Fatalf("Write in pop3.Handler %q error: %v", msg, writeErr)
+			return writeErr
 		}		
 	
 		if h.CanQuit {
