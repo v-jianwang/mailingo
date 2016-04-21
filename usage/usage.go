@@ -9,12 +9,32 @@ import (
 	"github.com/v-jianwang/mailingo/protocol"
 )
 
+
 type Usage struct {
+	ID string
 	Protocol string
 	Port int
 	InactiveTimeout time.Duration
+	// context map[string]interface{}
+	// ctxMux *sync.Mutex
 }
 
+// var (
+// 	context map[string][]byte
+// )
+
+// func Context(key string, defaul []byte) ([]byte, bool) {
+// 	b, ok := context[key]
+// 	if !ok {
+// 		context[key] = defaul
+// 		b := defaul
+// 	}
+// 	return b, ok
+// }
+
+// func SetContext(key string, b []byte) {
+// 	context[key] = b
+// }
 
 func (u Usage) Launch() {
 	addr := ":" + strconv.Itoa(u.Port)
@@ -33,13 +53,30 @@ func (u Usage) Launch() {
 			continue
 		}
 
-		go func(c *net.Conn, p string, t time.Duration) {
-			log.Println("Hello to a new client", (*c).RemoteAddr())
+		go func() {
+			log.Println("Hello to a new client", conn.RemoteAddr())
 
 			// create inactive timer for this connection
-			protocol.Serve(c, p, t)
+			protocol.Serve(&conn, u.ID, u.Protocol, u.InactiveTimeout)
 			
-			log.Println("Goodbye to the client", (*c).RemoteAddr())
-		}(&conn, u.Protocol, u.InactiveTimeout)
+			log.Println("Goodbye to the client", conn.RemoteAddr())
+		}()
 	}
 }
+
+// func (u Usage) Context(key string) (interface{}, bool) {
+// 	v, ok := u.context[key]
+// 	return v, ok
+// }
+
+// func (u Usage) SetContext(key string, ctx interface{}) {
+// 	u.context[key] = ctx
+// }
+
+// func (u Usage) Lock() {
+// 	u.ctxMux.Lock()
+// }
+
+// func (u Usage) Unlock() {
+// 	u.ctxMux.Unlock()
+// }

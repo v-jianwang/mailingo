@@ -15,20 +15,20 @@ func NewCommand(cmd string) *Command {
 	//"STAT"
 	//"LIST 1"
 	//"TOP 2 10"
-	var array = strings.Split(cmd, " ")
+	array := strings.Split(cmd, " ")
 	if len(array) <= 0 {
 		log.Panic("Command parsed error: %v", cmd)
 	}
 
-	var length = len(array) - 1
-	var command = &Command{
+	length := len(array) - 1
+	command := &Command{
 		Name: cmd,
 		Args: make([]string, length),
 	}
 
 	for i, v := range array {
 		if i == 0 {
-			command.Name = v
+			command.Name = strings.ToUpper(v)
 		} else {
 			command.Args[i-1] = v
 		}

@@ -11,7 +11,6 @@ type UsageContainer struct {
 }
 
 
-
 func NewUsageContainer() *UsageContainer {
 	container := &UsageContainer{
 		Usages: make(map[string]*Usage),
@@ -24,17 +23,18 @@ func NewUsageContainer() *UsageContainer {
 func (c *UsageContainer) NewUsage(name string, port int, inactive time.Duration) *Usage {
 	var usage *Usage
 
-	key := fmt.Sprintf("%s-%s", name, port)
-	if value, exists := c.Usages[key]; exists {
+	usageID := fmt.Sprintf("%s-%s", name, port)
+	if value, exists := c.Usages[usageID]; exists {
 		usage = value
 	} else {
 		usage = &Usage{
+			ID: usageID,
 			Protocol: name,
 			Port: port,
 			InactiveTimeout: inactive,
 		}
 
-		c.Usages[key] = usage
+		c.Usages[usageID] = usage
 		go usage.Launch()
 	}
 

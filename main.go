@@ -13,6 +13,7 @@ func main() {
 
 	println("pop3 and imap4 servers're running...")
 
+	// time.Sleep(60 * time.Second)
 	c := make(chan bool)
 	<-c
 }

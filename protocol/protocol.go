@@ -9,24 +9,25 @@ import (
 )
 
 
-type Handler interface {
-	Handle(BaseHandler) error
-}
-
-type BaseHandler interface {
-	Read() (string, error)
-	Write(msg string) error
-	Active() bool
-	IsClosed() bool
-	Dispose() bool
-}
-
-
 type Protocol struct {
 	Conn *net.Conn
 	Inactive time.Duration
 	Timer *time.Timer
 	Closed *bool
+
+}
+
+type BaseHandler interface {
+	Read() (string, error)
+	Write(string) error
+
+	Active() bool
+	IsClosed() bool
+	Dispose() bool
+}
+
+type Handler interface {
+	Handle(BaseHandler) error
 }
 
 
@@ -79,11 +80,11 @@ func newBaseHandler(c *net.Conn, inactive time.Duration) BaseHandler {
 	return p
 }
 
-func newHandler(name string) Handler {
+func newHandler(usageID string, name string) Handler {
 	var h Handler
 	switch name {
 		case "pop3":
-			h = NewHandlerPop3()
+			h = NewHandlerPop3(usageID)
 		case "imap4":
 			h = HandlerImap4{}
 	}
@@ -92,13 +93,12 @@ func newHandler(name string) Handler {
 }
 
 
-func Serve(c *net.Conn, name string, inactive time.Duration) {
+func Serve(c *net.Conn, usageID string, name string, inactive time.Duration) {
 	base := newBaseHandler(c, inactive)
-	handler := newHandler(name)
-
+	handler := newHandler(usageID, name)
 	err := handler.Handle(base)
 	if err != nil {
-		log.Fatalf("Handle %s error: %v", name, err)
+		log.Printf("Handle %s error: %v\n", name, err)
 	}
-	base.Dispose()
+
 }
