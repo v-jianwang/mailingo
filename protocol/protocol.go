@@ -21,7 +21,7 @@ type BaseHandler interface {
 	Read() (string, error)
 	Write(string) error
 
-	Active() bool
+	Pulse() bool
 	IsClosed() bool
 	Dispose() bool
 }
@@ -45,7 +45,7 @@ func (p Protocol) Write(message string) error {
 	}(p.Conn, message)
 }
 
-func (p Protocol) Active() bool {
+func (p Protocol) Pulse() bool {
 	return p.Timer.Reset(p.Inactive)
 }
 
@@ -68,6 +68,7 @@ func newBaseHandler(c *net.Conn, inactive time.Duration) BaseHandler {
 	cb := false
 	cp := &cb
 	t := time.AfterFunc(inactive, func() {
+			log.Println("inactive expired")
 			(*c).Close()
 			(*cp) = true
 		})

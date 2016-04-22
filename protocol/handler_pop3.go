@@ -82,7 +82,7 @@ func (h HandlerPop3) Handle(base BaseHandler) error {
 				log.Printf("Read in pop3.Handler error[%t]: %v\n", err, err)
 				break
 			} else {
-				base.Active()
+				base.Pulse()
 			}
 
 			h.CurrentCommand = pop3.NewCommand(line)
@@ -136,9 +136,9 @@ func (h HandlerPop3) Handle(base BaseHandler) error {
 
 	h.dispose()
 	base.Dispose()
-
 	return err
 }
+
 
 func (h *HandlerPop3) dispose() {
 	h.Maildrop.Unlock()
@@ -177,6 +177,14 @@ func (h *HandlerPop3) greet() string {
 
 func (h *HandlerPop3) quit() string {
 	h.CanQuit = true
+
+	if h.CurrentState == StateTransaction {
+		h.CurrentState = StateUpdate
+		// removes all messages marked as deleted
+		maildrop := h.Maildrop
+		maildrop.RemoveMails(false)
+	}
+
 	return fmt.Sprint(plusOK, " server is signing off", crlf)
 }
 
@@ -245,14 +253,16 @@ func (h HandlerPop3) list() string {
 	cmd := h.CurrentCommand
 	maildrop := h.Maildrop
 	count := maildrop.Count()
+	size := maildrop.Size()
 
 	if len(cmd.Args) == 0 {
 		var msg string
 		if count > 0 {
-			msg = fmt.Sprintf(" %d message(s) (%d octets)", maildrop.Count(), maildrop.Size())
+			msg = fmt.Sprintf(" %d message(s) (%d octets)", count, size)
 			msg = fmt.Sprint(plusOK, msg, crlf)
-			for _, mail := range maildrop.Mails {
-				if !mail.Deleted {
+
+			for i:=0; i<len(maildrop.Mails); i++ {
+				if mail := maildrop.GetMail(i+1, false); mail != nil {
 					msg += fmt.Sprint(mail.Number, mail.Size, crlf)
 				}
 			}
@@ -264,22 +274,15 @@ func (h HandlerPop3) list() string {
 		return msg
 	}
 
-	n, err := strconv.Atoi(cmd.Args[1])
+	n, err := strconv.Atoi(cmd.Args[0])
 	if err != nil {
-		return fmt.Sprint(negaERR, " argument is invalid")
+		return fmt.Sprint(negaERR, " argument is invalid", crlf)
 	}
 
-	var index int = -1
-	for i, m := range maildrop.Mails {
-		if !m.Deleted && m.Number == n {
-			index = i
-		}
-	}
-
-	if index > -1 {
-		return fmt.Sprint(plusOK, " ", n, maildrop.Mails[index].Size)
+	if mail := maildrop.GetMail(n, false); mail != nil {
+		return fmt.Sprint(plusOK, " ", n, mail.Size, crlf)
 	} else {
-		return fmt.Sprint(negaERR, " no such message")
+		return fmt.Sprint(negaERR, " no such message", crlf)
 	}
 }
 
@@ -290,7 +293,28 @@ func (h HandlerPop3) retr() string {
 
 
 func (h HandlerPop3) dele() string {
-	return ""
+	cmd := h.CurrentCommand
+	if len(cmd.Args) != 1 {
+		return fmt.Sprint(negaERR, " argument msg is invalid", crlf)
+	}
+
+	n, err := strconv.Atoi(cmd.Args[0])
+	if err != nil {
+		return fmt.Sprint(negaERR, " argument msg is invalid", crlf)
+	}
+
+	maildrop := h.Maildrop
+	
+	if mail := maildrop.GetMail(n, true); mail != nil {
+		if mail.Deleted {
+			return fmt.Sprint(negaERR, " message already deleted", crlf)
+		} else {
+			mail.Deleted = true
+			return fmt.Sprint(plusOK, " message deleted", crlf)
+		}
+	}
+
+	return fmt.Sprint(negaERR, " no such message", crlf)
 }
 
 
@@ -300,7 +324,9 @@ func (h HandlerPop3) noop() string {
 
 
 func (h HandlerPop3) rset() string {
-	return ""
+	maildrop := h.Maildrop
+	maildrop.ResetMails()
+	return h.stat()
 }
 
 

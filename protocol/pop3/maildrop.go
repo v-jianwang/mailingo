@@ -16,21 +16,21 @@ const (
 type Maildrop struct {
 	Username string
 	UsageID string
-	Mails []Mail
+	Mails []*Mail
 }
 
 
-func (m *Maildrop) Open() error {
-	path := maildropRoot + "\\" + m.Username
+func (md *Maildrop) Open() error {
+	path := maildropRoot + "\\" + md.Username
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		return err
 	}
 	
-	var mails []Mail
+	var mails []*Mail
 	for _, file := range files {
 		if dir := file.IsDir(); !dir {
-			mail := Mail{
+			mail := &Mail{
 				Number: len(mails) + 1,
 				Size: file.Size(),
 				Deleted: false,
@@ -38,14 +38,14 @@ func (m *Maildrop) Open() error {
 			mails = append(mails, mail)
 		}
 	}
-	m.Mails = mails
+	md.Mails = mails
 	return nil
 }
 
 
-func (m Maildrop) Count() int {
+func (md Maildrop) Count() int {
 	count := 0
-	for _, mail := range m.Mails {
+	for _, mail := range md.Mails {
 		if !mail.Deleted {
 			count++
 		}
@@ -54,9 +54,9 @@ func (m Maildrop) Count() int {
 }
 
 
-func (m Maildrop) Size() int64 {
+func (md Maildrop) Size() int64 {
 	var totalSize int64
-	for _, mail := range m.Mails {
+	for _, mail := range md.Mails {
 		if !mail.Deleted {
 			totalSize += mail.Size	
 		}
@@ -65,16 +65,16 @@ func (m Maildrop) Size() int64 {
 }
 
 
-func (m Maildrop) Lock() error {
+func (md Maildrop) Lock() error {
 	var locking []string
-	var user string = m.Username
+	var user string = md.Username
 
 	b, err := json.Marshal(locking)
 	if err != nil {
 		return err
 	}
 
-	state, _ := utils.Stated(m.UsageID)
+	state, _ := utils.Stated(md.UsageID)
 	state.Locker.Lock()
 	defer state.Locker.Unlock()
 
@@ -103,11 +103,11 @@ func (m Maildrop) Lock() error {
 }
 
 
-func (m Maildrop) Unlock() error {
+func (md Maildrop) Unlock() error {
 	var locking []string
-	var user string = m.Username
+	var user string = md.Username
 
-	state, _ := utils.Stated(m.UsageID)
+	state, _ := utils.Stated(md.UsageID)
 	state.Locker.Lock()
 	defer state.Locker.Unlock()
 
@@ -133,4 +133,31 @@ func (m Maildrop) Unlock() error {
 
 	state.SetItem(mailLockingKey, b)
 	return nil
+}
+
+
+func (md Maildrop) GetMail(num int, ignoreDeleted bool) *Mail {
+	for _, mail := range md.Mails {
+		if mail.Number == num && 
+			(ignoreDeleted || !mail.Deleted) {
+			return mail
+		}
+	}
+	return nil
+}
+
+
+func (md Maildrop) ResetMails() {
+	for _, mail := range md.Mails {
+		mail.Deleted = false
+	}	
+}
+
+
+func (md Maildrop) RemoveMails(ignoreDeleted bool) {
+	for _, mail := range md.Mails {
+		if ignoreDeleted || mail.Deleted {
+			mail.Remove()
+		}
+	}
 }

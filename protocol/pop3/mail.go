@@ -5,3 +5,9 @@ type Mail struct {
 	Size int64
 	Deleted bool
 }
+
+
+func (m Mail) Remove() error {
+	println("remove mail")
+	return nil
+}

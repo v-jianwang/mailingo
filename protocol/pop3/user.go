@@ -7,7 +7,7 @@ type User struct {
 }
 
 func (u *User) Authenticate() bool {
-	if u.Username == "jiang" && u.Password == "Password" {
+	if (u.Username == "jiang" || u.Username == "wang") && u.Password == "Password" {
 		return true
 	}
 	return false
