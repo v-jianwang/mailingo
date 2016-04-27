@@ -117,8 +117,8 @@ func (h HandlerPop3) Handle(base BaseHandler) error {
 				msg = h.rset()
 			case "TOP":
 				msg = h.top()
-			case "INVALID_CMD":
-				msg = h.invalid_command()
+			case "UNRECOGNIZED_CMD":
+				msg = h.unrecognized_cmd()
 			case "INCORRECT_STAT":
 				msg = h.incorrect_stat()
 		}		
@@ -154,7 +154,7 @@ func (h HandlerPop3) checkCommand(k string) (string, bool) {
 		}
 	}
 
-	return "INVALID_CMD", false
+	return "UNRECOGNIZED_CMD", false
 }
 
 
@@ -288,7 +288,32 @@ func (h HandlerPop3) list() string {
 
 
 func (h HandlerPop3) retr() string {
-	return ""
+	cmd := h.CurrentCommand
+	if len(cmd.Args) != 1 {
+		return fmt.Sprint(negaERR, " argument msg is invalid", crlf)
+	}
+
+	n, err := strconv.Atoi(cmd.Args[0])
+	if err != nil {
+		return fmt.Sprint(negaERR, " argument is invalid", crlf)
+	}
+
+	mail := h.Maildrop.GetMail(n, false)
+	if mail == nil {
+		return fmt.Sprint(negaERR, " no such message", crlf)
+	}
+
+	msg := fmt.Sprint(plusOK, " ", mail.Size, " octets", crlf)
+
+	head, _ := mail.Head()
+	msg += head
+
+	body, _ := mail.Body(-1)
+	msg += crlf
+	msg += body
+
+	msg += fmt.Sprint(".", crlf)
+	return msg
 }
 
 
@@ -331,11 +356,40 @@ func (h HandlerPop3) rset() string {
 
 
 func (h HandlerPop3) top() string {
-	return ""
+	cmd := h.CurrentCommand
+	if len(cmd.Args) != 2 {
+		return fmt.Sprint(negaERR, " argument msg is invalid", crlf)
+	}
+
+	n, err := strconv.Atoi(cmd.Args[0])
+	if err != nil {
+		return fmt.Sprint(negaERR, " argument msg is invalid", crlf)
+	}
+
+	maildrop := h.Maildrop
+	mail := maildrop.GetMail(n, false)
+	if mail == nil {
+		return fmt.Sprint(negaERR, " no such message", crlf)
+	}
+
+	msg := fmt.Sprint(plusOK, crlf)
+	header, _ := mail.Head()
+	msg += header
+
+	ln, err := strconv.Atoi(cmd.Args[1])
+	if err != nil {
+		return fmt.Sprint(negaERR, " argument n is invalid", crlf)
+	}
+
+	body, _ := mail.Body(ln)
+	msg += fmt.Sprint(crlf, body)
+
+	msg += fmt.Sprint(".", crlf)
+	return msg
 }
 
 
-func (h HandlerPop3) invalid_command() string {
+func (h HandlerPop3) unrecognized_cmd() string {
 	command := h.CurrentCommand.Name
 	// response to unrecognized, unimplemented or invalid command
 	msg := fmt.Sprintf(" command %s is unrecognized", command)

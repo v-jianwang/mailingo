@@ -3,7 +3,7 @@ package pop3
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"os"
 
 	"github.com/v-jianwang/mailingo/utils"
 )
@@ -11,6 +11,7 @@ import (
 const (
 	maildropRoot = "F:\\Root\\temp\\email"
 	mailLockingKey = "locking_maildrops"
+	pathSeparator = string(os.PathSeparator)
 )
 
 type Maildrop struct {
@@ -21,8 +22,13 @@ type Maildrop struct {
 
 
 func (md *Maildrop) Open() error {
-	path := maildropRoot + "\\" + md.Username
-	files, err := ioutil.ReadDir(path)
+	dirname := maildropRoot + pathSeparator + md.Username
+	f, err := os.Open(dirname)
+	if err != nil {
+		return err
+	}
+	files, err := f.Readdir(-1)
+	f.Close()
 	if err != nil {
 		return err
 	}
@@ -32,8 +38,12 @@ func (md *Maildrop) Open() error {
 		if dir := file.IsDir(); !dir {
 			mail := &Mail{
 				Number: len(mails) + 1,
+				Title: file.Name(),
 				Size: file.Size(),
 				Deleted: false,
+				Fullname: func(name string) string {
+					return dirname + pathSeparator + name 
+				},
 			}
 			mails = append(mails, mail)
 		}
@@ -157,7 +167,10 @@ func (md Maildrop) ResetMails() {
 func (md Maildrop) RemoveMails(ignoreDeleted bool) {
 	for _, mail := range md.Mails {
 		if ignoreDeleted || mail.Deleted {
-			mail.Remove()
+			err := mail.Delete()
+			if err != nil {
+				println(err.Error())
+			}
 		}
 	}
 }
